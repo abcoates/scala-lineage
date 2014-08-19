@@ -1,71 +1,63 @@
 package org.contakt.data.lineage
 
 import scala.collection.immutable.Map
-import scala.util.{Failure, Success, Try}
-import scala.concurrent.{ExecutionContext, Await, Future}
-import scala.concurrent.duration.Duration
+import scala.collection.mutable.HashMap
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 /**
  * Class which provides utility methods for parameter maps.
  */
-class ParameterMap(parameters: Map[Symbol, Any])(implicit executor: ExecutionContext) {
+class ParameterMap(parameters: Map[String, Future[Any]])(implicit executionContext: ExecutionContext) {
 
   /**
    * Retrieves the given named parameter, if possible.
    * @param name name of the parameter
-   * @return The value for the parameter in a Success , or an exception in a Failure.
+   * @return A future for the value for the parameter.
    */
-  def tryParameter(name: Symbol): Try[Any] = {
-    // TODO: if the value is a collection of values, apply the logic below to all of those values
-    if (parameters.contains(name)) {
-      parameters(name) match {
-        case success: Success[_] => success.get match { // if the value is a Success, check if the Success wraps a completed future
-          case future: Future[Any] if future.isCompleted => future.value.get // if the future is completed, unpack the 'Try' result.
-          case value => success
-        }
-        case tryValue: Try[Any] => tryValue // pass through any other Try values unchanged
-        case future: Future[Any] if future.isCompleted => future.value.get // if the future is completed, unpack the 'Try' result.
-        case future: Future[Any] => Success(Future) // pass through uncompleted futures as a success.
-        case ex: Throwable => Failure(ex) // treat any throwable/exception values as a failure
-        case null => Failure(new NullPointerException("null parameter value for name: " + name.toString)) // treat null values as a failure condition
-        case value => Success(value) // pass through any other value as a success.
+  def apply(name: String) = getParameter(name)
+
+  /**
+   * Retrieves the given named parameter, if possible.
+   * @param name name of the parameter
+   * @return A future for the value for the parameter.
+   * @throws NoSuchElementException if there is no parameter value matching the name.
+   */
+  def getParameter(name: String): Future[Any] = parameters(name)
+
+  /**
+   * Tries to return a value for the given parameter name.
+   * @param name name of the parameter.
+   * @return a Success value containing a Future if there is a parameter for the name, or a Failure value otherwise.
+   */
+  def tryParameter(name: String): Try[Future[Any]] = Try{ getParameter(name) }
+
+  /**
+   * Adds the given parameter map to this map.  If the same named parameter occurs in both parameter maps, a Future(Failure(...)) value is created in the combined map.
+   * @param parameters parameter map to add to this map.
+   * @return combined parameter map, possibly with some Future(Failure(...)) values where a parameter was multiply defined.
+   */
+  def ++(parameters: ParameterMap): ParameterMap = {
+    val combinedMap = new HashMap[String, Future[Any]]()
+    for (key <- keySet) {
+      if (parameters isDefinedAt key) { // check for erroneous multiply defined parameter values
+        combinedMap(key) = Future{ throw new DuplicatedParameterNameException(key, this(key), parameters(key)) }
+      } else {
+        combinedMap(key) = this(key)
       }
-    } else {
-      Failure(new NoSuchElementException("no parameter for name: " + name.toString)) // treat non-existance of the parameter name in the parameter map as a failure condition
     }
+    for (key <- parameters.keySet if !isDefinedAt(key)) {
+      combinedMap(key) = parameters(key)
+    }
+    new ParameterMap(Map[String, Future[Any]]() ++ combinedMap)
   }
 
   /**
-   * Like 'tryParameter', but if the parameter value is a Future, waits for it to complete with no timeout.
-   * Note that ideally, process blocks should be written to work with futures directly as much as possible.
+   * Whether the given parameter name has a value defined for it, or not.
    * @param name name of the parameter.
-   * @return The value for the parameter in a Success, or an exception in a Failure.
+   * @return whether there is a parameter for the given name.
    */
-  def awaitParameter(name: Symbol): Try[Any] = awaitParameter(name, Duration.Inf)
-
-  /**
-   * Like 'tryParameter', but if the parameter value is a Future, waits for it to complete with the given duration.
-   * Note that ideally, process blocks should be written to work with futures directly as much as possible.
-   * @param name name of the parameter.
-   * @param atMost timeout duration for waiting for completion of a 'Future' value.
-   * @return The value for the parameter in a Success, or an exception in a Failure.
-   */
-  def awaitParameter(name: Symbol, atMost: Duration): Try[Any] = ???
-
-  /**
-   * Retrieves the given named parameter, if possible, unwrapping the value if it is a 'Success' value.
-   * @param name name of the parameter.
-   * @return The Option containing the parameter value, if one exists, otherwise None.
-   */
-  def getParameter(name: Symbol): Option[Any] = ???
-
-  /**
-   * Retrieves the given named parameter, if possible, otherwise returns the provided default value.
-   * @param name name of the parameter
-   * @param default default value for the parameter
-   * @return A value for the parameter, either the retrieved value or the default value.
-   */
-  def getParameterOrElse(name: Symbol, default: => Any): Any = ???
+  def isDefinedAt(name: String) = parameters isDefinedAt name
 
   /**
    * Returns the number of parameters.
@@ -73,4 +65,20 @@ class ParameterMap(parameters: Map[Symbol, Any])(implicit executor: ExecutionCon
    */
   def size = parameters.size
 
+  /**
+   * Returns a set of the defined parameter names.
+   * @return a set of parameter name strings.
+   */
+  def keySet = parameters.keySet
+
 }
+
+/**
+ * Exception for duplicated parameter errors.
+ */
+class DuplicatedParameterNameException(name: String, oldValue: Any, newValue: Any) extends Exception(s"duplicated string name in parameter map: $name: old value = ($oldValue), new value = ($newValue)") {}
+
+/**
+ * Exception for parameter validation errors.
+ */
+class ParameterValidationException(message: String, name: String, value: Any) extends ValidationException(message, value) {}

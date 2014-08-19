@@ -1,117 +1,115 @@
 package org.contakt.data.lineage
 
-import java.util.concurrent.ConcurrentHashMap
-import scala.collection.immutable.Map
 import scala.collection.mutable.HashMap
-import scala.concurrent.{ExecutionContext, Await, Future, blocking}
-import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future, ExecutionContext}
+import scala.util.Try
 
 /**
  * Class which provides utility methods for result maps.
  */
-class ResultMap(implicit executor: ExecutionContext) {
+class ResultMap(implicit executionContext: ExecutionContext) {
 
-  /** Thread-safe map used to collect results. */
-  private var results = new ConcurrentHashMap[Symbol, Any]()
+  /** Thread-safe map for storing the result values. */
+  private var results = new HashMap[String, Future[Any]]()
 
   /**
-   * Puts a result in the result map.
-   * If the result is a zero-parameter function, evaluates the function in a Future of a Try.
-   * If the result is not a function, it should be an immutable value.
-   * If there is already a value for the name, a list of values is created as the result for the name.
-   * @param name name of the result
-   * @param value value for the result
-   * @return the result value.  If 'value' was a zero-parameter function, returns a Future(Try(...)) value for the function evaluation.
+   * Adds a result to the result map in a thread-safe way.
+   * @param name name of the result.
+   * @param value a Future value for the result.
+   * @throws DuplicatedResultNameException if the map already contains a result with the same name.
+   *
    */
-  def putResult(name: Symbol, value: Any): Any = {
-    value match {
-      case value: Function0[Any] =>
-        val valueFuture = Future{ Try{ (value.asInstanceOf[Function0[Any]])() } }
-        checkPutResult(name, valueFuture)
-        valueFuture
-      case value =>
-        checkPutResult(name, value)
-        value
-    }
-  }
-
-  /** Thread-safe method to put a result to the results map.  Creates a results list for the name if there is already a value. */
-  private def checkPutResult(name: Symbol, value: Any) {
-    blocking {
-      synchronized {
-        if (results.containsKey(name)) {
-          results.put(name, value :: results.get(name) :: Nil)
-        } else {
-          results.put(name, value)
-        }
+  def addResult(name: String, value: Future[Any]) {
+    synchronized {
+      if (results.isDefinedAt(name)) {
+        throw new DuplicatedResultNameException(name, results.get(name), value)
       }
+      results.put(name, value)
     }
   }
 
   /**
-   * Retrieves the given named result, if possible.
-   * @param name name of the result
-   * @return The value for the result in a Success, or an exception in a Failure.
-   */
-  def tryResult(name: Symbol) = ???
-
-  /**
-   * Like 'tryResult', but if the result value is a Future, waits for it to complete with no timeout.
-   * Note that ideally, process blocks should be written to work with futures directly as much as possible.
+   * Tries to add a result to the result map in a thread-safe way.
    * @param name name of the result.
-   * @return The value for the result in a Success, or an exception in a Failure.
+   * @param value a Future value for the result.
+   * @return a Success value if the value could be added, or a Failure value otherwise.
    */
-  def awaitResult(name: Symbol): Try[Any] = awaitResult(name, Duration.Inf)
+  def tryAddResult(name: String, value: Future[Any]) = Try{ addResult(name, value) }
 
   /**
-   * Like 'tryResult', but if the result value is a Future, waits for it to complete with the given duration.
-   * Note that ideally, process blocks should be written to work with futures directly as much as possible.
+   * Whether the given result name has a value defined for it, or not.
    * @param name name of the result.
-   * @param atMost timeout duration for waiting for completion of a 'Future' value.
-   * @return The value for the result in a Success, or an exception in a Failure.
+   * @return whether there is a result for the given name.
    */
-  def awaitResult(name: Symbol, atMost: Duration): Try[Any] = ???
+  def isDefinedAt(name: String) = results isDefinedAt name
 
   /**
-   * Retrieves the given named result, if possible, unwrapping the value if it is a 'Success' value.
+   * Returns the result for the given name.
+   * @param name name of the result to return.
+   * @return result value for the name.(
+   * @throws NoSuchElementException if there is no result matching the given name.
+   */
+  def apply(name: String) = getResult(name)
+
+  /**
+   * Returns the result for the given name.
+   * @param name name of the result to return.
+   * @return result value for the name.(
+   * @throws NoSuchElementException if there is no result matching the given name.
+   */
+  def getResult(name: String): Future[Any] = results(name)
+
+  /**
+   * Tries to return a value for the given result name.
    * @param name name of the result.
-   * @return The Option containing the result value, if one exists, otherwise None.
+   * @return a Success value containing a Future if there is a result for the name, or a Failure value otherwise.
    */
-  def getResult(name: Symbol): Option[Any] = ???
+  def tryResult(name: String): Try[Future[Any]] = Try{ getResult(name) }
 
   /**
-   * Retrieves the given named result, if possible, otherwise returns the provided default value.
-   * @param name name of the result
-   * @param default default value for the result
-   * @return A value for the result, either the retrieved value or the default value.
+   * Returns the results as an immutable map.
+   * @return immutable name of the result names and matching future values.
    */
-  def getResultOrElse(name: Symbol, default: => Any): Any = ???
+  def getResults: Map[String, Future[Any]] = Map[String, Future[Any]]() ++ results // convert to immutable map
 
   /**
-   * Returns the contents of the ResultMap as an immutable Scala map.
-   * @return map of reults.  Some of the results may be Future(Try(...)) values.
+   * Like 'getResults', but waits until all of the futures have completed, and returns their completion values.
+   * Note: Ideally, process blocks should retain their inputs/outputs as futures until the last possible moment, to maximise opportunities for multi-threading.
+   * @return immutable map of the result names and matching values.
    */
-  def getResultMap: Map[Symbol, Any] = ???
+  def awaitResults: Map[String, Try[Any]] = awaitResults(Duration.Inf)
 
   /**
-   * Like 'getResultMap', but if the result value is a Future, waits for it to complete with no timeout.
-   * Note that ideally, process blocks should be written to work with futures directly as much as possible.
-   * @return map of results, with any futures resolved to Try values.
+   * Like 'awaitResults', but times out on any futures that don't complete within the duration 'atMost'.
+   * Note: Ideally, process blocks should retain their inputs/outputs as futures until the last possible moment, to maximise opportunities for multi-threading.
+   * @param atMost maximum duration after which futures are timed-out, yielding an exception as the completion value.
+   * @return immutable map of the result names and matching values.
    */
-  def awaitResultMap: Map[Symbol, Any] = awaitResultMap(Duration.Inf)
+  def awaitResults(atMost: Duration): Map[String, Try[Any]] = {
+    getResults map { mapping => mapping._1 -> Try{ Await.result(mapping._2, atMost) } }
+  }
 
   /**
-   * Like 'getResultMap', but if the result value is a Future, waits for it to complete with the given timeout.
-   * Note that ideally, process blocks should be written to work with futures directly as much as possible.
-   * @return map of results, with any futures resolved to Try values.
-   */
-  def awaitResultMap(atMost: Duration): Map[Symbol, Any] = ???
-
-  /**
-   * Returns the number of results.
-   * @return the number of results.
+   * Return the number of named results in the result set.
+   * @return number of named results.
    */
   def size = results.size
 
+  /**
+   * Returns a set of the defined result names.
+   * @return a set of result name strings.
+   */
+  def keySet = results.keySet
+
 }
+
+/**
+ * Exception for duplicated result errors.
+ */
+class DuplicatedResultNameException(name: String, oldValue: Any, newValue: Any) extends Exception(s"duplicated string name in result map: $name: old value = ($oldValue), new value = ($newValue)") {}
+
+/**
+ * Exception for result validation errors.
+ */
+class ResultValidationException(message: String, name: String, value: Any) extends ValidationException(message, value) {}
