@@ -46,21 +46,4 @@ package object lineage {
 //    mapping._1 -> valueToFuture(mapping._2)
 //  }
 
-  /**
-   * Converts a future into a typed future.
-   * @param f a plain future.
-   * @tparam T type of the result of the future.
-   * @return a typed future containing the future and its return type.
-   */
-  implicit def futureToTypedFuture[T](f: Future[T])(implicit manifest: Manifest[T]): TypedFuture[T] = TypedFuture[T](f)
-
-
-  /**
-   * Converts a parameterless function into a typed future.
-   * @param f a parameterless function.
-   * @tparam T type of the result of the function.
-   * @return a typed future containing the future and its return type.
-   */
-  implicit def functionToTypedFuture[T](f: () => T)(implicit manifest: Manifest[T]): TypedFuture[T] = TypedFuture[T](Future{f()})
-
 }
