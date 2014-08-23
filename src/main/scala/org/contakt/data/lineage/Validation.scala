@@ -63,14 +63,14 @@ abstract class Validation[T] extends Function1[Future[T], Future[T]] {
 object Validation {
 
   /** A pass-through validation that doesn't check anything. */
-  def NONE[T] = new Validation[T] {
-    override def apply(future: Future[T]): Future[T] = future
+  def NONE = new Validation[Any] {
+    override def apply(future: Future[Any]): Future[Any] = future
   }
 
-  def hasResultClass[T](clazz: Class[_])(implicit executionContext: ExecutionContext) = new Validation[T] {
-    override def apply(future: Future[T]): Future[T] = future map { value => // note use of 'map' to create a new Future based on the eventual completed value of 'future', with exceptions passed through automatically
+  def hasResultClass(clazz: Class[_])(implicit executionContext: ExecutionContext) = new Validation[Any] {
+    override def apply(future: Future[Any]): Future[Any] = future map { value => // note use of 'map' to create a new Future based on the eventual completed value of 'future', with exceptions passed through automatically
       try {
-        (clazz cast value).asInstanceOf[T] // check if value is a valid 'clazz', but then need to coerce back to a T
+        clazz cast value // check if value is a valid 'clazz'
       }
       catch {
         case _: Throwable => throw new ValidationException(s"value doesn't match class '${clazz.getCanonicalName}': $value", value)
@@ -78,8 +78,8 @@ object Validation {
     }
   }
 
-  def equalTo[T](expectedValue: Any)(implicit executionContext: ExecutionContext) = new Validation[T] {
-    override def apply(future: Future[T]): Future[T] = future map { value => // note use of 'map' to create a new Future based on the eventual completed value of 'future', with exceptions passed through automatically
+  def equalTo(expectedValue: Any)(implicit executionContext: ExecutionContext) = new Validation[Any] {
+    override def apply(future: Future[Any]): Future[Any] = future map { value => // note use of 'map' to create a new Future based on the eventual completed value of 'future', with exceptions passed through automatically
       if (value == expectedValue) {
         value
       } else {

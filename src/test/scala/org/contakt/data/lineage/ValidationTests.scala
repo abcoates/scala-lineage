@@ -54,7 +54,7 @@ class ValidationTests extends FlatSpec with Matchers {
     val future = newSuccessFuture
     assert(!future.isCompleted)
     assert(future.value === None)
-    val validation = NONE[Any] // note that 'NONE' needs a type, but the type can be 'Any'
+    val validation = NONE // note that 'NONE' needs a type, but the type can be 'Any'
     val validatedFuture = validation(future)
     assert(validatedFuture eq future)
     Await.ready(validatedFuture, Duration.Inf)
@@ -76,7 +76,7 @@ class ValidationTests extends FlatSpec with Matchers {
     val future = Future{ value }
     assert(!future.isCompleted)
     assert(future.value === None)
-    val validation = hasResultClass[Int](classOf[java.lang.Integer]) // note that 'hasResultClass' needs a type
+    val validation = hasResultClass(classOf[java.lang.Integer]) // note that 'hasResultClass' needs a type
     val validatedFuture = validation(future)
     Await.ready(validatedFuture, Duration.Inf)
     assert(future.isCompleted)
