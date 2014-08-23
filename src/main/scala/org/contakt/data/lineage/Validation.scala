@@ -8,15 +8,16 @@ import scala.util.{Success, Failure, Try}
 * Trait for a function that can be used to validate a future, returning the same future is successful, or a Future(Failure(...)) if validation fails.
 */
 abstract class Validation[T] extends Function1[Future[T], Future[T]] {
-//
+
 //  /**
 //   * Combines two validations via an 'and' operation.
 //   * @param vld validation to 'and' with this validation.
 //   * @return new 'and' validation.
 //   */
-//  def &&(vld: Validation): Validation = new Validation {
+//  def &&(vld: Validation) = new Validation[T] {
 //
-//    def apply[T](future: Future[T]): Future[T] = {
+//    // TODO: update this to use something akin to 'map', but which provides a 'Try'
+//    def apply(future: Future[T]): Future[T] = {
 //      Await.ready(future, Duration.Inf)
 //      future.value.get match {
 //        case failure: Failure[_] => future
@@ -37,9 +38,10 @@ abstract class Validation[T] extends Function1[Future[T], Future[T]] {
 //   * @param vld validation to 'or' with this validation.
 //   * @return new 'or' validation.
 //   */
-//  def ||(vld: Validation): Validation = new Validation {
+//  def ||(vld: Validation) = new Validation[T] {
 //
-//    def apply[T](future: Future[T]): Future[T] = {
+//    // TODO: update this to use something akin to 'map', but which provides a 'Try'
+//    def apply(future: Future[T]): Future[T] = {
 //      Await.ready(future, Duration.Inf)
 //      future.value.get match {
 //        case failure: Failure[_] => future
