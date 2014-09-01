@@ -54,7 +54,7 @@ class ValidationTests extends FlatSpec with Matchers {
     val future = newSuccessFuture
     assert(!future.isCompleted)
     assert(future.value === None)
-    val validation = NONE // note that 'NONE' needs a type, but the type can be 'Any'
+    val validation = NONE
     val validatedFuture = validation(future)
     assert(validatedFuture eq future)
     Await.ready(validatedFuture, Duration.Inf)
@@ -72,24 +72,46 @@ class ValidationTests extends FlatSpec with Matchers {
   }
 
   it should "be possible to validate a future's result against an expected class" in {
+    val validation = hasResultClass(classOf[java.lang.Integer]) // note: the Java 'Integer' type needs to be used here
+
+    // This should succeed.
     val value = 1
     val future = Future{ value }
     assert(!future.isCompleted)
     assert(future.value === None)
-    val validation = hasResultClass(classOf[java.lang.Integer]) // note that 'hasResultClass' needs a type
     val validatedFuture = validation(future)
     Await.ready(validatedFuture, Duration.Inf)
     assert(future.isCompleted)
     assert(validatedFuture.isCompleted)
-    println(s"future value: ${future.value}")
-    println(s"validated future value: ${validatedFuture.value}")
     assert(
       validatedFuture.value match { // check for a Some(Success(1)) value
         case Some(Success(x)) => x match {
-          case int: Int if int == value => true
+          case int: Int => int == value
           case _ => false
         }
         case _ => false
+      }
+    )
+
+    // This should fail.
+    val value2 = 2.0
+    val future2 = Future{ value2 }
+    assert(!future2.isCompleted)
+    assert(future2.value === None)
+    val validatedFuture2 = validation(future2)
+    Await.ready(validatedFuture2, Duration.Inf)
+    assert(future2.isCompleted)
+    assert(validatedFuture2.isCompleted)
+    assert(
+      validatedFuture2.value match { // check for a Some(Failure(ValidationException(...))) value
+        case Some(Failure(t)) => t match {
+          case ve: ValidationException =>
+            (ve.label.get == "org.contakt.data.lineage.Validation#hasResultClass") &&
+              (ve.value == value2) &&
+              (ve.thrown.get.isInstanceOf[ClassCastException])
+          case other => println(s"fail #1: $other"); false
+        }
+        case other => println(s"fail #2: $other"); false
       }
     )
   }

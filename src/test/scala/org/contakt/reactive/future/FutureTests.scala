@@ -15,6 +15,8 @@ class FutureTests extends FlatSpec with Matchers {
     val value = 5
     val future = Future{ Thread.sleep(100); value }
     assert(!future.isCompleted)
+
+    // **** Version 1: create a Promise for the result, use 'andThen' on the original future to complete the promise.
     val newPromise = Promise[Int]
     future.andThen {
       case Failure(t) => newPromise failure t
@@ -23,9 +25,11 @@ class FutureTests extends FlatSpec with Matchers {
     val newFuture = newPromise.future
     assert(!newFuture.isCompleted)
 
+    // **** Version 2: use a 'for' comprehension to create the result future.
     val newFuture2 = for (x <- future) yield (x * 2)
     assert(!newFuture2.isCompleted)
 
+    // **** Version 3: use 'map' to create the result future.
     val newFuture3 = future map { _ * 2 }
     assert(!newFuture3.isCompleted)
 
@@ -43,6 +47,8 @@ class FutureTests extends FlatSpec with Matchers {
     val value = 5
     val future = Future{ Thread.sleep(100); throw new Exception() ; value }
     assert(!future.isCompleted)
+
+    // **** Version 1: create a Promise for the result, use 'andThen' on the original future to complete the promise.
     val newPromise = Promise[Int]
     future.andThen {
       case Failure(t) => newPromise failure t
@@ -51,9 +57,11 @@ class FutureTests extends FlatSpec with Matchers {
     val newFuture = newPromise.future
     assert(!newFuture.isCompleted)
 
+    // **** Version 2: use a 'for' comprehension to create the result future.
     val newFuture2 = for (x <- future) yield (x * 2)
     assert(!newFuture2.isCompleted)
 
+    // **** Version 3: use 'map' to create the result future.
     val newFuture3 = future map { _ * 2 }
     assert(!newFuture3.isCompleted)
 
@@ -80,7 +88,7 @@ class FutureTests extends FlatSpec with Matchers {
     val value = 5
     val future = Future{ Thread.sleep(100); 5 }
     val newFuture = future collect { case 5 => 5 } // should return 5
-    val newFuture2 = future collect { case 3 => 3 } // should throw 'NoSuchElementException
+    val newFuture2 = future collect { case 3 => 3 } // should throw 'NoSuchElementException'
     assert(!newFuture.isCompleted)
     assert(!newFuture2.isCompleted)
 
