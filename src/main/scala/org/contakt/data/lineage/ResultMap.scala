@@ -11,21 +11,23 @@ import scala.util.Try
 class ResultMap(implicit executionContext: ExecutionContext) {
 
   /** Thread-safe map for storing the result values. */
-  private var results = new HashMap[String, Future[Any]]()
+  private var results = new HashMap[String, Future[_]]()
 
   /**
    * Adds a result to the result map in a thread-safe way.
    * @param name name of the result.
    * @param value a Future value for the result.
+   * @return the added result value.
    * @throws DuplicatedResultNameException if the map already contains a result with the same name.
    *
    */
-  def addResult(name: String, value: Future[Any]) {
+  def addResult(name: String, value: Future[_]): Future[_] = {
     synchronized {
       if (results.isDefinedAt(name)) {
         throw new DuplicatedResultNameException(name, results.get(name), value)
       }
       results.put(name, value)
+      value
     }
   }
 
@@ -35,7 +37,7 @@ class ResultMap(implicit executionContext: ExecutionContext) {
    * @param value a Future value for the result.
    * @return a Success value if the value could be added, or a Failure value otherwise.
    */
-  def tryAddResult(name: String, value: Future[Any]) = Try{ addResult(name, value) }
+  def tryAddResult(name: String, value: Future[_]) = Try{ addResult(name, value) }
 
   /**
    * Whether the given result name has a value defined for it, or not.
@@ -58,27 +60,27 @@ class ResultMap(implicit executionContext: ExecutionContext) {
    * @return result value for the name.(
    * @throws NoSuchElementException if there is no result matching the given name.
    */
-  def getResult(name: String): Future[Any] = results(name)
+  def getResult(name: String): Future[_] = results(name)
 
   /**
    * Tries to return a value for the given result name.
    * @param name name of the result.
    * @return a Success value containing a Future if there is a result for the name, or a Failure value otherwise.
    */
-  def tryResult(name: String): Try[Future[Any]] = Try{ getResult(name) }
+  def tryGetResult(name: String): Try[Future[_]] = Try{ getResult(name) }
 
   /**
    * Returns the results as an immutable map.
    * @return immutable name of the result names and matching future values.
    */
-  def getResults: Map[String, Future[Any]] = Map[String, Future[Any]]() ++ results // convert to immutable map
+  def getResults: Map[String, Future[_]] = Map[String, Future[_]]() ++ results // convert to immutable map
 
   /**
    * Like 'getResults', but waits until all of the futures have completed, and returns their completion values.
    * Note: Ideally, process blocks should retain their inputs/outputs as futures until the last possible moment, to maximise opportunities for multi-threading.
    * @return immutable map of the result names and matching values.
    */
-  def awaitResults: Map[String, Try[Any]] = awaitResults(Duration.Inf)
+  def awaitResults: Map[String, Try[_]] = awaitResults(Duration.Inf)
 
   /**
    * Like 'awaitResults', but times out on any futures that don't complete within the duration 'atMost'.
@@ -86,7 +88,7 @@ class ResultMap(implicit executionContext: ExecutionContext) {
    * @param atMost maximum duration after which futures are timed-out, yielding an exception as the completion value.
    * @return immutable map of the result names and matching values.
    */
-  def awaitResults(atMost: Duration): Map[String, Try[Any]] = {
+  def awaitResults(atMost: Duration): Map[String, Try[_]] = {
     getResults map { mapping => mapping._1 -> Try{ Await.result(mapping._2, atMost) } }
   }
 

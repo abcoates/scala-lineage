@@ -71,8 +71,8 @@ object Validation {
     override def apply(future: Future[Any]) = future
   }
 
-  /** This validation checks that the result of the future can be cast to the given class. */
-  def hasResultClass(clazz: Class[_])(implicit executionContext: ExecutionContext) = new Validation[Any] {
+  /** This validation checks that the result value of the future can be cast to the given class. */
+  def hasValueClass(clazz: Class[_])(implicit executionContext: ExecutionContext) = new Validation[Any] {
     override def apply(future: Future[Any]) = future map { value => // note use of 'map' to create a new Future based on the eventual completed value of 'future', with exceptions passed through automatically
       try {
         val castValue = clazz cast value // check if value is a valid 'clazz'

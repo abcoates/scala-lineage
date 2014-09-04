@@ -20,30 +20,30 @@ package object lineage {
    */
   implicit def symbolToString(symbol: Symbol): String = symbol.name
 
-//  /**
-//   * Converts a Tuple2[Symbol,Any] into a Tuple2[String, Any].  Provided so that symbols can be used in name mappings for process blocks, parameters, results, etc.
-//   * @param tuple tuple for which the first item should be converted to a string.
-//   * @return a converted tuple with a string instead of a symbol
-//   */
-//  implicit def symbolTuple2ToStringTuple2[T](tuple: Tuple2[Symbol, T]): Tuple2[String, T] = (symbolToString(tuple._1), tuple._2)
-//
-//  /**
-//   * Converts a value into a Future[Any], if it is not already a future.
-//   * @param value value to convert into a future, if necessary.
-//   * @return a future for the value.
-//   */
-//  implicit def valueToFuture(value: Any): Future[Any] = value match {
-//    case future: Future[Any] => future
-//    case value => Future{ value }
-//  }
-//
-// /**
-//   * Converts a map from String -> Any to a map from String -> Try[Any].
-//   * @param map a map from String -> Any.
-//   * @return a map from String -> Try[Any].
-//   */
-//  implicit def valueMapToTryMap(map: Map[String, Any]): Map[String, Future[Any]] = map.map{mapping =>
-//    mapping._1 -> valueToFuture(mapping._2)
-//  }
+  /**
+   * Converts a Tuple2[Symbol,Any] into a Tuple2[String, Any].  Provided so that symbols can be used in name mappings for process blocks, parameters, results, etc.
+   * @param tuple tuple for which the first item should be converted to a string.
+   * @return a converted tuple with a string instead of a symbol
+   */
+  implicit def symbolTuple2ToStringTuple2[T](tuple: Tuple2[Symbol, T]): Tuple2[String, T] = (symbolToString(tuple._1), tuple._2)
+
+  /**
+   * Converts a value into a Future[Any], if it is not already a future.
+   * @param value value to convert into a future, if necessary.
+   * @return a future for the value.
+   */
+  implicit def valueToFuture[T](value: T): Future[_] = value match {
+    case future: Future[_] => future
+    case value => Future{ value }
+  }
+
+  /**
+   * Converts a map from String -> Any to a map from String -> Future[Any].
+   * @param valueMap a map from String -> Any.
+   * @return a map from String -> Future[Any].
+   */
+  implicit def valueMapToFutureMap(valueMap: Map[String, _]): Map[String, Future[_]] = valueMap map { mapping =>
+    mapping._1 -> valueToFuture(mapping._2)
+  }
 
 }

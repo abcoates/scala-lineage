@@ -75,7 +75,7 @@ class ValidationTests extends FlatSpec with Matchers {
   }
 
   it should "be possible to validate a future's result against an expected class" in {
-    val validation = hasResultClass(classOf[java.lang.Integer]) // note: the Java 'Integer' type needs to be used here
+    val validation = hasValueClass(classOf[java.lang.Integer]) // note: the Java 'Integer' type needs to be used here
 
     // This should succeed.
     val value = 1
@@ -165,7 +165,7 @@ class ValidationTests extends FlatSpec with Matchers {
   }
 
   it should "be possible to do an 'and' between two validations" in {
-    val validation1 = hasResultClass(classOf[java.lang.Integer]) // note: the Java 'Integer' type needs to be used here
+    val validation1 = hasValueClass(classOf[java.lang.Integer]) // note: the Java 'Integer' type needs to be used here
     val validation2 = equalTo(1)
     val validation = validation1 && validation2
 
@@ -234,7 +234,7 @@ class ValidationTests extends FlatSpec with Matchers {
   }
 
   it should "be possible to do an 'or' between two validations" in {
-    val validation1 = hasResultClass(classOf[java.lang.Integer]) // note: the Java 'Integer' type needs to be used here
+    val validation1 = hasValueClass(classOf[java.lang.Integer]) // note: the Java 'Integer' type needs to be used here
     val validation2 = equalTo(1.0)
     val validation = validation1 || validation2
 
