@@ -57,9 +57,7 @@ trait ProcessBlock {
    */
   def run(parameters: ParameterMap)(implicit executor: ExecutionContext = executionContext): ResultMap = {
     val actualParameters = validateParameters(parameters ++ constParameters)
-    val results = process(actualParameters)
-    val actualResults = validateResults(results)
-    actualResults
+    validateResults(process(actualParameters))
   }
 
   /**
@@ -68,7 +66,23 @@ trait ProcessBlock {
    * @return validated parameters, some of which may have been converted to futures of failures.
    */
   private def validateParameters(runParameters: ParameterMap): ParameterMap = {
-    runParameters // TODO: implement this
+    val validatedMapSet = for (param <- parameters.keySet) yield {
+      if (runParameters isDefinedAt param) {
+        val validation = parameters(param).asInstanceOf[Validation[Any]]
+        param -> validation(runParameters(param))
+      } else {
+        param -> Future{
+          throw new ParameterValidationException(
+            Some(s"missing parameter: $param"),
+            s"no parameter found with name: $param",
+            None,
+            Some(new NoSuchElementException(s"missing parameter: $param"))
+          )
+        }
+      }
+    }
+    val validatedMap = validatedMapSet.toMap[String, Future[_]]
+    new ParameterMap(validatedMap)
   }
 
   /**
@@ -77,7 +91,23 @@ trait ProcessBlock {
    * @return validated results, some of which may have been converted to futures of failures.
    */
   private def validateResults(runResults: ResultMap): ResultMap = {
-    runResults // TODO: implement this
+    val newResultMap = new ResultMap()
+    for (result <- results.keySet) yield {
+      if (runResults isDefinedAt result) {
+        val validation = results(result).asInstanceOf[Validation[Any]]
+        newResultMap.addResult(result, validation(runResults(result)))
+      } else {
+        newResultMap.addResult(result, Future{
+          throw new ResultValidationException(
+            Some(s"missing result: $result"),
+            s"no result found with name: $result",
+            None,
+            Some(new NoSuchElementException(s"missing result: $result"))
+          )
+        })
+      }
+    }
+    newResultMap
   }
 
   // TODO: add a method to return a dynamically-generated process map.

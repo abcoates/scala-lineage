@@ -2,13 +2,24 @@ package org.contakt.data.lineage
 
 import org.contakt.data.lineage.Validation._
 import org.scalatest.{Matchers, FlatSpec}
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Future, Await}
+import scala.util.{Failure, Try, Success}
 
 /**
 * Tests for ProcessBlock class.
 */
 class ProcessBlockTests extends FlatSpec with Matchers {
+
+  /** Quick test that a 'Try' is a 'Success'. */
+  def isSuccess(value: Try[_]): Boolean = value match {
+    case Success(x) => true
+    case _ => false
+  }
+
+  /** Quick test that a 'Try' is a 'Failure'. */
+  def isFailure(value: Try[_]): Boolean = value match {
+    case Failure(t) => true
+    case _ => false
+  }
 
   /**
    * Creates a new, simple process block which computes the sum and difference of two integer parameters.
@@ -62,8 +73,8 @@ class ProcessBlockTests extends FlatSpec with Matchers {
     )
     val parameters = new ParameterMap(map)(pb.executionContext)
     val results = pb run parameters
+    val resultsMap = results.awaitResults
     for (key <- results.keySet) {
-      Await.ready(results(key), Duration.Inf)
       assert(results(key).isCompleted)
     }
     assert(results('sum).value.get.get === map('a) + map('b))
