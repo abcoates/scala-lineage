@@ -1,61 +1,63 @@
 package org.contakt.data.lineage
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.{ExecutionContext, Await, Future}
-import scala.util.{Success, Failure, Try}
+import scala.concurrent.{Promise, ExecutionContext, Future}
+import scala.util.{Success, Failure}
 
 /**
 * Trait for a function that can be used to validate a future, returning the same future is successful, or a Future(Failure(...)) if validation fails.
 */
-abstract class Validation[T](label: Option[String] = None) extends Function1[Future[T], Future[T]] {
+abstract class Validation[T](label: Option[String] = None)(implicit executionContext: ExecutionContext) extends Function1[Future[T], Future[T]] {
 
-//  /**
-//   * Combines two validations via an 'and' operation.
-//   * @param vld validation to 'and' with this validation.
-//   * @return new 'and' validation.
-//   */
-//  def &&(vld: Validation) = new Validation[T] {
-//
-//    // TODO: update this to use something akin to 'map', but which provides a 'Try'
-//    def apply(future: Future[T]): Future[T] = {
-//      Await.ready(future, Duration.Inf)
-//      future.value.get match {
-//        case failure: Failure[_] => future
-//        case _ =>
-//          val validatedFuture = this(future)
-//          Await.ready(validatedFuture, Duration.Inf)
-//          validatedFuture.value.get match {
-//            case failure: Failure[_] => validatedFuture
-//            case _ => vld(future) // if the 1st validation passed, run the 2nd validation
-//          }
-//      }
-//    }
-//
-//  }
-//
-//  /**
-//   * Combines two validations via an 'or' operation.
-//   * @param vld validation to 'or' with this validation.
-//   * @return new 'or' validation.
-//   */
-//  def ||(vld: Validation) = new Validation[T] {
-//
-//    // TODO: update this to use something akin to 'map', but which provides a 'Try'
-//    def apply(future: Future[T]): Future[T] = {
-//      Await.ready(future, Duration.Inf)
-//      future.value.get match {
-//        case failure: Failure[_] => future
-//        case _ =>
-//          val validatedFuture = this(future)
-//          Await.ready(validatedFuture, Duration.Inf)
-//          validatedFuture.value.get match {
-//            case success: Success[_] => future // if the 1st validation passed, skip the second validation
-//            case _ => vld(future)
-//          }
-//      }
-//    }
-//
-//  }
+  /** Used to refer to the correct 'this' when returning functions. */
+  private val thisValidation = this
+  
+  /**
+   * Combines two validations via an 'and' operation.
+   * @param vld validation to 'and' with this validation.
+   * @return new 'and' validation.
+   */
+  def &&(vld: Validation[T]) = new Validation[T] {
+    
+    def apply(future: Future[T]): Future[T] = {
+      val newPromise = Promise[T]
+      future.andThen {
+        case Failure(t) => newPromise failure t
+        case Success(x) => thisValidation(future).andThen {
+          case Failure(t) => newPromise failure t
+          case Success(x) => vld(future).andThen {
+            case Failure(t) => newPromise failure t
+            case Success(x) => newPromise success x
+          }
+        }
+      }
+      newPromise.future
+    }
+
+  }
+
+  /**
+   * Combines two validations via an 'or' operation.
+   * @param vld validation to 'or' with this validation.
+   * @return new 'or' validation.
+   */
+  def ||(vld: Validation[T]) = new Validation[T] {
+
+    def apply(future: Future[T]): Future[T] = {
+      val newPromise = Promise[T]
+      future.andThen {
+        case Failure(t) => newPromise failure t
+        case Success(x) => thisValidation(future).andThen {
+          case Success(x) => newPromise success x
+          case Failure(t) => vld(future).andThen {
+            case Failure(t) => newPromise failure t
+            case Success(x) => newPromise success x
+          }
+        }
+      }
+      newPromise.future
+    }
+
+  }
 
 }
 
@@ -65,10 +67,11 @@ abstract class Validation[T](label: Option[String] = None) extends Function1[Fut
 object Validation {
 
   /** A pass-through validation that doesn't check anything. */
-  def NONE = new Validation[Any] {
+  def NONE(implicit executionContext: ExecutionContext) = new Validation[Any] {
     override def apply(future: Future[Any]) = future
   }
 
+  /** This validation checks that the result of the future can be cast to the given class. */
   def hasResultClass(clazz: Class[_])(implicit executionContext: ExecutionContext) = new Validation[Any] {
     override def apply(future: Future[Any]) = future map { value => // note use of 'map' to create a new Future based on the eventual completed value of 'future', with exceptions passed through automatically
       try {
@@ -82,6 +85,7 @@ object Validation {
     }
   }
 
+  /** This validation checks that the result of the future has a particular value. */
   def equalTo(expectedValue: Any)(implicit executionContext: ExecutionContext) = new Validation[Any] {
     override def apply(future: Future[Any]) = future map { value => // note use of 'map' to create a new Future based on the eventual completed value of 'future', with exceptions passed through automatically
       if (value == expectedValue) {
