@@ -119,7 +119,61 @@ class ProcessBlockTests extends FlatSpec with Matchers {
     })
   }
 
-  // TODO: it should "produce a Failure when a parameter fails validation" in {} // TODO: should wrap a parameter exception in the result exception
+  it should "produce a Failure when a parameter fails validation" in { // TODO: should wrap a parameter exception in the result exception
+    val pb = new SimpleTestProcessBlock()
+    val map = Map[String, Any](
+      'a -> 3,
+      'b -> 2.0 // note: not an Int as expected
+    )
+    val parameters = new ParameterMap(map)(pb.executionContext)
+    val results = pb run parameters
+    val resultsMap = results.awaitResults
+    for (key <- results.keySet) {
+      assert(results(key).isCompleted)
+    }
+    assert(results('sum).value.isDefined && results('sum).value.get.isFailure)
+    assert(results('sum).value match {
+      case Some(Failure(t)) => // Check for a 'ResultValidationException' containing a 'ParameterValidationException' containing a 'ValidationException' containing a 'ClassCastException'
+        if (t.isInstanceOf[ResultValidationException]) {
+          val tt = t.asInstanceOf[ResultValidationException].thrown
+          if (tt.isDefined && tt.get.isInstanceOf[ParameterValidationException]) {
+            val ttt = tt.get.asInstanceOf[ParameterValidationException].thrown
+            if (ttt.isDefined && ttt.get.isInstanceOf[ValidationException]) {
+              val tttt = ttt.get.asInstanceOf[ValidationException].thrown
+              tttt.isDefined && tttt.get.isInstanceOf[ClassCastException]
+            } else {
+              false
+            }
+          } else {
+            false
+          }
+        } else {
+          false
+        }
+      case _ => false
+    })
+    assert(results('diff).value.isDefined && results('diff).value.get.isFailure)
+    assert(results('diff).value match {
+      case Some(Failure(t)) => // Check for a 'ResultValidationException' containing a 'ParameterValidationException' containing a 'ValidationException' containing a 'ClassCastException'
+        if (t.isInstanceOf[ResultValidationException]) {
+          val tt = t.asInstanceOf[ResultValidationException].thrown
+          if (tt.isDefined && tt.get.isInstanceOf[ParameterValidationException]) {
+            val ttt = tt.get.asInstanceOf[ParameterValidationException].thrown
+            if (ttt.isDefined && ttt.get.isInstanceOf[ValidationException]) {
+              val tttt = ttt.get.asInstanceOf[ValidationException].thrown
+              tttt.isDefined && tttt.get.isInstanceOf[ClassCastException]
+            } else {
+              false
+            }
+          } else {
+            false
+          }
+        } else {
+          false
+        }
+      case _ => false
+    })
+  }
 
   // TODO: it should "produce a Failure when an exception is throw while calculating a result in {}
 
