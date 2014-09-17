@@ -1,5 +1,7 @@
 package org.contakt.data
 
+import org.contakt.reactive.future.RichFuture
+
 import scala.collection.generic.FilterMonadic
 import scala.collection.immutable.Map
 import scala.concurrent.{Promise, Await, Future}
@@ -45,5 +47,13 @@ package object lineage {
   implicit def valueMapToFutureMap(valueMap: Map[String, _]): Map[String, Future[_]] = valueMap map { mapping =>
     mapping._1 -> valueToFuture(mapping._2)
   }
+
+  /**
+   * Converts a Future to a RichFuture.
+   * @param future a Future.
+   * @tparam T result type for the Future.
+   * @return a RichFuture that adds new methods to the Future.
+   */
+  implicit def futureToRichFuture[T](future: Future[T]): RichFuture[T] = new RichFuture(future)
 
 }

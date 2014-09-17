@@ -22,10 +22,9 @@ class ProcessBlockTests extends FlatSpec with Matchers {
   }
 
   /**
-   * Creates a new, simple process block which computes the sum and difference of two integer parameters.
-   * @return a new, simple process block.
+   * A simple process block for use in testing.  Computes the sum and difference of two integer parameters.
    */
-  def newSimpleProcessBlock = new ProcessBlock {
+  class SimpleTestProcessBlock extends ProcessBlock {
 
     /** The class for Scala 'Int' values. */
     val IntClass = classOf[java.lang.Integer]
@@ -66,7 +65,7 @@ class ProcessBlockTests extends FlatSpec with Matchers {
   }
 
   "A process block" should "be able to be created and run" in {
-    val pb = newSimpleProcessBlock
+    val pb = new SimpleTestProcessBlock()
     val map = Map[String, Int](
       'a -> 3,
       'b -> 2
@@ -80,5 +79,52 @@ class ProcessBlockTests extends FlatSpec with Matchers {
     assert(results('sum).value.get.get === map('a) + map('b))
     assert(results('diff).value.get.get === map('a) - map('b))
   }
+
+  it should "produce a Failure when a result fails validation" in {
+    val pb = new SimpleTestProcessBlock {
+      override def process: (ParameterMap) => ResultMap = { parameters: ParameterMap =>
+        val results = new ResultMap()
+        val sumResult = for (a <- parameters('a); b <- parameters('b)) yield (a.asInstanceOf[Int] + b.asInstanceOf[Int]) // 'for' can be used to add futures and return a future
+        results.addResult('sum, sumResult)
+        val diffResult = for (a <- parameters('a); b <- parameters('b)) yield (a.asInstanceOf[Int] - b.asInstanceOf[Int]) // 'for' can be used to subtract futures and return a future
+        results.addResult('diff, diffResult.toString) // note: wrong result type
+        results
+      }
+    }
+    val map = Map[String, Int](
+      'a -> 3,
+      'b -> 2
+    )
+    val parameters = new ParameterMap(map)(pb.executionContext)
+    val results = pb run parameters
+    val resultsMap = results.awaitResults
+    for (key <- results.keySet) {
+      assert(results(key).isCompleted)
+    }
+    assert(results('sum).value.get.get === map('a) + map('b))
+    assert(results('diff).value match {
+      case Some(Failure(t)) => // Check for a 'ResultValidationException' containing a 'ValidationException' containing a 'ClassCastException'
+        if (t.isInstanceOf[ResultValidationException]) {
+          val tt = t.asInstanceOf[ResultValidationException].thrown
+          if (tt.isDefined && tt.get.isInstanceOf[ValidationException]) {
+            val ttt = tt.get.asInstanceOf[ValidationException].thrown
+            ttt.isDefined && ttt.get.isInstanceOf[ClassCastException]
+          } else {
+            false
+          }
+        } else {
+          false
+        }
+      case _ => false
+    })
+  }
+
+  // TODO: it should "produce a Failure when a parameter fails validation" in {} // TODO: should wrap a parameter exception in the result exception
+
+  // TODO: it should "produce a Failure when an exception is throw while calculating a result in {}
+
+  // TODO: it should "be able to use constant (pre-defined) parameters of the process block" in {}
+
+  // TODO: it should "not allow a runtime parameter to have the same name as any constant parameter" in {}
 
 }

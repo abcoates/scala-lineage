@@ -1,6 +1,8 @@
 package org.contakt.data.lineage
 
+import org.contakt.data.lineage._
 import scala.concurrent.{Future, ExecutionContext}
+import scala.util.{Try, Failure}
 
 /**
 * Trait for processing blocks that take named inputs and produce named outputs.
@@ -69,11 +71,19 @@ trait ProcessBlock {
     val validatedMapSet = for (param <- parameters.keySet) yield {
       if (runParameters isDefinedAt param) {
         val validation = parameters(param).asInstanceOf[Validation[Any]]
-        param -> validation(runParameters(param))
+        param -> (validation(runParameters(param)) collectValue {
+          case Failure(t) => Failure(new ParameterValidationException(
+            Some(s"parameter '$param' in process block '${name}'"),
+            s"parameter failed validation: $param",
+            runParameters(param),
+            Some(t)
+          ))
+          case other: Try[_] => other
+        })
       } else {
-        param -> Future{
+        param -> Future {
           throw new ParameterValidationException(
-            Some(s"missing parameter: $param"),
+            Some(s"missing parameter in '$param' in process block '${name}'"),
             s"no parameter found with name: $param",
             None,
             Some(new NoSuchElementException(s"missing parameter: $param"))
@@ -95,11 +105,22 @@ trait ProcessBlock {
     for (result <- results.keySet) yield {
       if (runResults isDefinedAt result) {
         val validation = results(result).asInstanceOf[Validation[Any]]
-        newResultMap.addResult(result, validation(runResults(result)))
+        newResultMap.addResult(
+          result,
+          validation(runResults(result)) collectValue {
+            case Failure(t) => Failure(new ResultValidationException(
+              Some(s"result '$result' in process block '${name}'"),
+              s"result failed validation: $result",
+              runResults(result),
+              Some(t)
+            ))
+            case other: Try[_] => other
+          }
+        )
       } else {
         newResultMap.addResult(result, Future{
           throw new ResultValidationException(
-            Some(s"missing result: $result"),
+            Some(s"missing result in '$result' in process block '${name}'"),
             s"no result found with name: $result",
             None,
             Some(new NoSuchElementException(s"missing result: $result"))
@@ -111,5 +132,7 @@ trait ProcessBlock {
   }
 
   // TODO: add a method to return a dynamically-generated process map.
+
+  // TODO: how to flag unused run-time parameters?
 
 }
