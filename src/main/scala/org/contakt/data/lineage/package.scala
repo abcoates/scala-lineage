@@ -2,12 +2,11 @@ package org.contakt.data
 
 import org.contakt.reactive.future.RichFuture
 
-import scala.collection.generic.FilterMonadic
 import scala.collection.immutable.Map
-import scala.concurrent.{Promise, Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
 import scala.language.implicitConversions
+import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -55,5 +54,62 @@ package object lineage {
    * @return a RichFuture that adds new methods to the Future.
    */
   implicit def futureToRichFuture[T](future: Future[T]): RichFuture[T] = new RichFuture(future)
+
+  /** Quick test that a 'Try' is a 'Success'. */
+  def isSuccess(value: Try[_]): Boolean = value match {
+    case Success(x) => true
+    case _ => false
+  }
+
+  /** Quick test that a 'Try' is a 'Failure'. */
+  def isFailure(value: Try[_]): Boolean = value match {
+    case Failure(t) => true
+    case _ => false
+  }
+
+  /**
+   * Checks whether the given exception or throwable and its 'cause' chain match the given list of Throwable classes.
+   * @param t exception or throwable to check.
+   * @param classChain list of expected classes, starting at this throwable and following "cause" values.
+   * @return whether the 'cause' chain matches the list of classes, or not.
+   */
+  def checkExceptionChain(t: Throwable, classChain: List[Class[_]]): Boolean = {
+    classChain match {
+      case Nil => t == null // a null exception matches an empty chain
+      case head::tail =>
+        if (Try{ head cast t} isSuccess) {
+          checkExceptionChain(t getCause, tail.asInstanceOf[List[Class[_]]]) // if the head matches, try the rest of the tail
+        } else {
+          false
+        }
+      case _ => false
+    }
+  }
+
+  /**
+   * Extends "checkExceptionChain(Throwable, List[Class[_]])" to work with objects that might reasonably wrap a Throwable.
+   * @param obj exception or throwable or wrapping object to check.
+   * @param classChain list of expected classes, starting at the first throwable and following "cause" values.
+   * @return whether the 'cause' chain matches the list of classes, or not.
+   */
+  def checkExceptionChain(obj: Any, classChain: List[Class[_]]): Boolean = {
+    classChain match {
+      case Nil =>
+        obj match {
+          case null => true
+          case None => true
+          case Success(x) => true
+          case future: Future[_] => checkExceptionChain(future.value, classChain)
+          case _ => false
+        }
+      case chain =>
+        obj match {
+          case Some(x) => checkExceptionChain(x, chain)
+          case Failure(t) => checkExceptionChain(t, chain)
+          case future: Future[_] => checkExceptionChain(future.value, classChain)
+          case _ => false
+        }
+    }
+  }
 
 }

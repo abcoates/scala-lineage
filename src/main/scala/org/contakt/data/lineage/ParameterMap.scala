@@ -81,4 +81,4 @@ class DuplicatedParameterNameException(name: String, oldValue: Any, newValue: An
 /**
  * Exception for parameter validation errors.
  */
-class ParameterValidationException(label: Option[String], message: String, value: Any, thrown: Option[Throwable]) extends ValidationException(label, message, value, thrown) {}
+class ParameterValidationException(label: Option[String], message: String, value: Any, cause: Option[Throwable]) extends ValidationException(label, message, value, cause) {}

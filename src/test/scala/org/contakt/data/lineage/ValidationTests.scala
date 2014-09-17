@@ -111,7 +111,7 @@ class ValidationTests extends FlatSpec with Matchers {
           case ve: ValidationException =>
             (ve.label.get == "org.contakt.data.lineage.Validation#hasResultClass") &&
               (ve.value == value2) &&
-              (ve.thrown.get.isInstanceOf[ClassCastException])
+              (ve.cause.get.isInstanceOf[ClassCastException])
           case other => println(s"fail #1: $other"); false
         }
         case other => println(s"fail #2: $other"); false
@@ -156,7 +156,7 @@ class ValidationTests extends FlatSpec with Matchers {
           case ve: ValidationException =>
             (ve.label.get == "org.contakt.data.lineage.Validation#equalTo") &&
               (ve.value == value2) &&
-              (ve.thrown.isEmpty)
+              (ve.cause.isEmpty)
           case other => println(s"fail #1: $other"); false
         }
         case other => println(s"fail #2: $other"); false
@@ -203,7 +203,7 @@ class ValidationTests extends FlatSpec with Matchers {
           case ve: ValidationException =>
             (ve.label.get == "org.contakt.data.lineage.Validation#equalTo") &&
               (ve.value == value2) &&
-              (ve.thrown.isEmpty)
+              (ve.cause.isEmpty)
           case other => println(s"fail #1: $other"); false
         }
         case other => println(s"fail #2: $other"); false
@@ -225,7 +225,7 @@ class ValidationTests extends FlatSpec with Matchers {
           case ve: ValidationException =>
             (ve.label.get == "org.contakt.data.lineage.Validation#hasResultClass") &&
               (ve.value == value3) &&
-              (ve.thrown.get.isInstanceOf[ClassCastException])
+              (ve.cause.get.isInstanceOf[ClassCastException])
           case other => println(s"fail #1: $other"); false
         }
         case other => println(s"fail #2: $other"); false
@@ -294,7 +294,7 @@ class ValidationTests extends FlatSpec with Matchers {
                 (ve.label.get == "org.contakt.data.lineage.Validation#equalTo")
             ) &&
               (ve.value == value3) &&
-              (ve.thrown.isEmpty || ve.thrown.get.isInstanceOf[ClassCastException])
+              (ve.cause.isEmpty || ve.cause.get.isInstanceOf[ClassCastException])
           case other => println(s"fail #1: $other"); false
         }
         case other => println(s"fail #2: $other"); false

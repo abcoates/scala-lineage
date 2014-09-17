@@ -114,4 +114,4 @@ class DuplicatedResultNameException(name: String, oldValue: Any, newValue: Any) 
 /**
  * Exception for result validation errors.
  */
-class ResultValidationException(label: Option[String], message: String, value: Any, thrown: Option[Throwable]) extends ValidationException(label, message, value, thrown) {}
+class ResultValidationException(label: Option[String], message: String, value: Any, cause: Option[Throwable]) extends ValidationException(label, message, value, cause) {}

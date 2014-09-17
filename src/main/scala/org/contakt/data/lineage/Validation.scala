@@ -1,7 +1,7 @@
 package org.contakt.data.lineage
 
 import scala.concurrent.{Promise, ExecutionContext, Future}
-import scala.util.{Success, Failure}
+import scala.util.{Try, Success, Failure}
 
 /**
 * Trait for a function that can be used to validate a future, returning the same future is successful, or a Future(Failure(...)) if validation fails.
@@ -101,4 +101,4 @@ object Validation {
 /**
 * Exception for validation errors.
 */
-case class ValidationException(label: Option[String], message: String, value: Any, thrown: Option[Throwable]) extends Exception(if (label.isDefined) s"$label: $message" else message, thrown getOrElse null) {}
+case class ValidationException(label: Option[String], message: String, value: Any, cause: Option[Throwable]) extends Exception(if (label.isDefined) s"$label: $message" else message, cause getOrElse null) {}

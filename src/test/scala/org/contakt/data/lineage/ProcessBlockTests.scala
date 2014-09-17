@@ -9,18 +9,6 @@ import scala.util.{Failure, Try, Success}
 */
 class ProcessBlockTests extends FlatSpec with Matchers {
 
-  /** Quick test that a 'Try' is a 'Success'. */
-  def isSuccess(value: Try[_]): Boolean = value match {
-    case Success(x) => true
-    case _ => false
-  }
-
-  /** Quick test that a 'Try' is a 'Failure'. */
-  def isFailure(value: Try[_]): Boolean = value match {
-    case Failure(t) => true
-    case _ => false
-  }
-
   /**
    * A simple process block for use in testing.  Computes the sum and difference of two integer parameters.
    */
@@ -102,21 +90,11 @@ class ProcessBlockTests extends FlatSpec with Matchers {
       assert(results(key).isCompleted)
     }
     assert(results('sum).value.get.get === map('a) + map('b))
-    assert(results('diff).value match {
-      case Some(Failure(t)) => // Check for a 'ResultValidationException' containing a 'ValidationException' containing a 'ClassCastException'
-        if (t.isInstanceOf[ResultValidationException]) {
-          val tt = t.asInstanceOf[ResultValidationException].thrown
-          if (tt.isDefined && tt.get.isInstanceOf[ValidationException]) {
-            val ttt = tt.get.asInstanceOf[ValidationException].thrown
-            ttt.isDefined && ttt.get.isInstanceOf[ClassCastException]
-          } else {
-            false
-          }
-        } else {
-          false
-        }
-      case _ => false
-    })
+    assert(results('diff).value.isDefined && results('diff).value.get.isFailure)
+    assert(checkExceptionChain(
+      results('diff),
+      List(classOf[ResultValidationException], classOf[ValidationException], classOf[ClassCastException])
+    ))
   }
 
   it should "produce a Failure when a parameter fails validation" in { // TODO: should wrap a parameter exception in the result exception
@@ -132,47 +110,15 @@ class ProcessBlockTests extends FlatSpec with Matchers {
       assert(results(key).isCompleted)
     }
     assert(results('sum).value.isDefined && results('sum).value.get.isFailure)
-    assert(results('sum).value match {
-      case Some(Failure(t)) => // Check for a 'ResultValidationException' containing a 'ParameterValidationException' containing a 'ValidationException' containing a 'ClassCastException'
-        if (t.isInstanceOf[ResultValidationException]) {
-          val tt = t.asInstanceOf[ResultValidationException].thrown
-          if (tt.isDefined && tt.get.isInstanceOf[ParameterValidationException]) {
-            val ttt = tt.get.asInstanceOf[ParameterValidationException].thrown
-            if (ttt.isDefined && ttt.get.isInstanceOf[ValidationException]) {
-              val tttt = ttt.get.asInstanceOf[ValidationException].thrown
-              tttt.isDefined && tttt.get.isInstanceOf[ClassCastException]
-            } else {
-              false
-            }
-          } else {
-            false
-          }
-        } else {
-          false
-        }
-      case _ => false
-    })
+    assert(checkExceptionChain(
+      results('sum),
+      List(classOf[ResultValidationException], classOf[ParameterValidationException], classOf[ValidationException], classOf[ClassCastException])
+    ))
     assert(results('diff).value.isDefined && results('diff).value.get.isFailure)
-    assert(results('diff).value match {
-      case Some(Failure(t)) => // Check for a 'ResultValidationException' containing a 'ParameterValidationException' containing a 'ValidationException' containing a 'ClassCastException'
-        if (t.isInstanceOf[ResultValidationException]) {
-          val tt = t.asInstanceOf[ResultValidationException].thrown
-          if (tt.isDefined && tt.get.isInstanceOf[ParameterValidationException]) {
-            val ttt = tt.get.asInstanceOf[ParameterValidationException].thrown
-            if (ttt.isDefined && ttt.get.isInstanceOf[ValidationException]) {
-              val tttt = ttt.get.asInstanceOf[ValidationException].thrown
-              tttt.isDefined && tttt.get.isInstanceOf[ClassCastException]
-            } else {
-              false
-            }
-          } else {
-            false
-          }
-        } else {
-          false
-        }
-      case _ => false
-    })
+    assert(checkExceptionChain(
+      results('diff),
+      List(classOf[ResultValidationException], classOf[ParameterValidationException], classOf[ValidationException], classOf[ClassCastException])
+    ))
   }
 
   // TODO: it should "produce a Failure when an exception is throw while calculating a result in {}
