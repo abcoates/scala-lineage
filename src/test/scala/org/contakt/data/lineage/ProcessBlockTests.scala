@@ -2,12 +2,16 @@ package org.contakt.data.lineage
 
 import org.contakt.data.lineage.Validation._
 import org.scalatest.{Matchers, FlatSpec}
-import scala.util.{Failure, Try, Success}
+import scala.concurrent.Future
+import scala.language.postfixOps
+import scala.util.Failure
 
 /**
 * Tests for ProcessBlock class.
 */
 class ProcessBlockTests extends FlatSpec with Matchers {
+  
+  val futurePauseMsec = 100
 
   /**
    * A simple process block for use in testing.  Computes the sum and difference of two integer parameters.
@@ -28,13 +32,15 @@ class ProcessBlockTests extends FlatSpec with Matchers {
      * Note: must include all parameters, including constant parameters defined by 'constParameters'.
      * @return map of name symbols and matching validations.
      */
-    override def parameters = Map[String, Validation[_]]('a -> hasValueClass(IntClass), 'b -> hasValueClass(IntClass))
+    override def parameterChecks = parameterCheckMap
+    private val parameterCheckMap = Map[String, Validation[_]]('a -> hasValueClass(IntClass), 'b -> hasValueClass(IntClass))
 
     /**
      * Defines the results for a process block, and validations for those results.
      * @return map of name symbols and matching validations.
      */
-    override def results = Map[String, Validation[_]]('sum -> hasValueClass(IntClass), 'diff -> hasValueClass(IntClass))
+    override def resultChecks = resultCheckMap
+    private val resultCheckMap = Map[String, Validation[_]]('sum -> hasValueClass(IntClass), 'diff -> hasValueClass(IntClass))
 
     /**
      * Core processing function for the process block.
@@ -42,12 +48,12 @@ class ProcessBlockTests extends FlatSpec with Matchers {
      * @return function which is run by 'run' to perform the core processing.
      */
     override def process: (ParameterMap) => ResultMap = { parameters: ParameterMap =>
-      val results = new ResultMap()
+      val processResults = new ResultMap()
       val sumResult = for (a <- parameters('a); b <- parameters('b)) yield (a.asInstanceOf[Int] + b.asInstanceOf[Int]) // 'for' can be used to add futures and return a future
-      results.addResult('sum, sumResult)
+      processResults.addResult('sum, sumResult)
       val diffResult = for (a <- parameters('a); b <- parameters('b)) yield (a.asInstanceOf[Int] - b.asInstanceOf[Int]) // 'for' can be used to subtract futures and return a future
-      results.addResult('diff, diffResult)
-      results
+      processResults.addResult('diff, diffResult)
+      processResults
     }
 
   }
@@ -59,23 +65,23 @@ class ProcessBlockTests extends FlatSpec with Matchers {
       'b -> 2
     )
     val parameters = new ParameterMap(map)(pb.executionContext)
-    val results = pb run parameters
-    val resultsMap = results.awaitResults
-    for (key <- results.keySet) {
-      assert(results(key).isCompleted)
+    val runResults = pb run parameters
+    val resultsMap = runResults.awaitResults
+    for (key <- runResults.keySet) {
+      assert(runResults(key).isCompleted)
     }
-    assert(results('sum).value.get.get === map('a) + map('b))
-    assert(results('diff).value.get.get === map('a) - map('b))
+    assert(runResults('sum).value.get.get === map('a) + map('b))
+    assert(runResults('diff).value.get.get === map('a) - map('b))
   }
 
   it should "produce a Failure when a result fails validation" in {
     val pb = new SimpleTestProcessBlock {
       override def process: (ParameterMap) => ResultMap = { parameters: ParameterMap =>
         val results = new ResultMap()
-        val sumResult = for (a <- parameters('a); b <- parameters('b)) yield (a.asInstanceOf[Int] + b.asInstanceOf[Int]) // 'for' can be used to add futures and return a future
+        val sumResult: Future[Int] = for (a <- parameters('a); b <- parameters('b)) yield (a.asInstanceOf[Int] + b.asInstanceOf[Int]) // 'for' can be used to add futures and return a future
         results.addResult('sum, sumResult)
-        val diffResult = for (a <- parameters('a); b <- parameters('b)) yield (a.asInstanceOf[Int] - b.asInstanceOf[Int]) // 'for' can be used to subtract futures and return a future
-        results.addResult('diff, diffResult.toString) // note: wrong result type
+        val diffResult: Future[String] = for (a <- parameters('a); b <- parameters('b)) yield ((a.asInstanceOf[Int] - b.asInstanceOf[Int])).toString // 'for' can be used to subtract futures and return a future
+        results.addResult('diff, diffResult) // note: wrong result type - String, not Int
         results
       }
     }
@@ -84,44 +90,77 @@ class ProcessBlockTests extends FlatSpec with Matchers {
       'b -> 2
     )
     val parameters = new ParameterMap(map)(pb.executionContext)
-    val results = pb run parameters
-    val resultsMap = results.awaitResults
-    for (key <- results.keySet) {
-      assert(results(key).isCompleted)
+    val runResults = pb run parameters
+    val resultsMap = runResults.awaitResults
+    for (key <- runResults.keySet) {
+      assert(runResults(key).isCompleted)
     }
-    assert(results('sum).value.get.get === map('a) + map('b))
-    assert(results('diff).value.isDefined && results('diff).value.get.isFailure)
+    assert(runResults('sum).value.get.get === map('a) + map('b))
+    assert(runResults('diff).value.isDefined && runResults('diff).value.get.isFailure)
     assert(checkExceptionChain(
-      results('diff),
+      runResults('diff),
       List(classOf[ResultValidationException], classOf[ValidationException], classOf[ClassCastException])
     ))
   }
 
-  it should "produce a Failure when a parameter fails validation" in { // TODO: should wrap a parameter exception in the result exception
+  it should "produce a Failure when a parameter fails validation" in {
     val pb = new SimpleTestProcessBlock()
     val map = Map[String, Any](
       'a -> 3,
       'b -> 2.0 // note: not an Int as expected
     )
     val parameters = new ParameterMap(map)(pb.executionContext)
-    val results = pb run parameters
-    val resultsMap = results.awaitResults
-    for (key <- results.keySet) {
-      assert(results(key).isCompleted)
+    val runResults = pb run parameters
+    val resultsMap = runResults.awaitResults
+    for (key <- runResults.keySet) {
+      assert(runResults(key).isCompleted)
     }
-    assert(results('sum).value.isDefined && results('sum).value.get.isFailure)
+    assert(runResults('sum).value.isDefined && runResults('sum).value.get.isFailure)
     assert(checkExceptionChain(
-      results('sum),
+      runResults('sum),
       List(classOf[ResultValidationException], classOf[ParameterValidationException], classOf[ValidationException], classOf[ClassCastException])
     ))
-    assert(results('diff).value.isDefined && results('diff).value.get.isFailure)
+    assert(runResults('diff).value.isDefined && runResults('diff).value.get.isFailure)
     assert(checkExceptionChain(
-      results('diff),
+      runResults('diff),
       List(classOf[ResultValidationException], classOf[ParameterValidationException], classOf[ValidationException], classOf[ClassCastException])
     ))
   }
 
-  // TODO: it should "produce a Failure when an exception is throw while calculating a result in {}
+  it should "produce a Failure when an exception is throw while calculating a result" in {
+    val exceptionLabel = "LABEL0001"
+    val pb = new SimpleTestProcessBlock {
+      override def process: (ParameterMap) => ResultMap = { parameters: ParameterMap =>
+        val results = new ResultMap()
+        val sumResult = for (a <- parameters('a); b <- parameters('b)) yield (a.asInstanceOf[Int] + b.asInstanceOf[Int]) // 'for' can be used to add futures and return a future
+        results.addResult('sum, sumResult)
+        val diffResult = Future { // using an explicit Future here to make sure the Exception is passed through as a Failure as expected
+          Thread.sleep(futurePauseMsec)
+          throw new Exception(s"$exceptionLabel - test exception to check process block behaviour")
+          (parameters('a).asInstanceOf[Int] -  parameters('b).asInstanceOf[Int])
+        }
+        results.addResult('diff, diffResult) // note: should be a failure due to the exception
+        results
+      }
+    }
+    val map = Map[String, Int](
+      'a -> 3,
+      'b -> 2
+    )
+    val parameters = new ParameterMap(map)(pb.executionContext)
+    val runResults = pb run parameters
+    val resultsMap = runResults.awaitResults
+    for (key <- runResults.keySet) {
+      assert(runResults(key).isCompleted)
+    }
+    assert(runResults('sum).value.get.get === map('a) + map('b))
+    assert(runResults('diff).value.isDefined && runResults('diff).value.get.isFailure)
+    assert(checkExceptionChain(
+      runResults('diff),
+      List(classOf[ResultValidationException], classOf[Exception])
+    ))
+    assert(runResults('diff).value.get.asInstanceOf[Failure[_]].exception.getCause.getMessage.startsWith(exceptionLabel))
+  }
 
   // TODO: it should "be able to use constant (pre-defined) parameters of the process block" in {}
 

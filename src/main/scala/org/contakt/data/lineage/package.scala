@@ -112,4 +112,17 @@ package object lineage {
     }
   }
 
+  /**
+   * For a wrapped object, returns the class of the wrapped inner object.  Otherwise returns the class of the object.
+   * @param obj object for which to get the inner class.
+   * @return class of the inner object.
+   */
+  def innerClass(obj: Any): Class[_] = obj match {
+    case Some(x) => innerClass(x)
+    case Success(x) => innerClass(x)
+    case Failure(t) => innerClass(t)
+    case future: Future[_] => innerClass(future.value)
+    case other => other.getClass
+  }
+
 }

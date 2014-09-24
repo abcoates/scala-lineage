@@ -22,13 +22,13 @@ trait ProcessBlock {
    * Note: must include all parameters, including constant parameters defined by 'constParameters'.
    * @return map of name strings and matching validations.
    */
-  def parameters: Map[String, Validation[_]]
+  def parameterChecks: Map[String, Validation[_]]
 
   /**
    * Defines the results for a process block, and validations for those results.
    * @return map of name strings and matching validations.
    */
-  def results: Map[String, Validation[_]]
+  def resultChecks: Map[String, Validation[_]]
 
   /**
    * Core processing function for the process block.
@@ -68,9 +68,9 @@ trait ProcessBlock {
    * @return validated parameters, some of which may have been converted to futures of failures.
    */
   private def validateParameters(runParameters: ParameterMap): ParameterMap = {
-    val validatedMapSet = for (param <- parameters.keySet) yield {
+    val validatedMapSet = for (param <- parameterChecks.keySet) yield {
       if (runParameters isDefinedAt param) {
-        val validation = parameters(param).asInstanceOf[Validation[Any]]
+        val validation = parameterChecks(param).asInstanceOf[Validation[Any]]
         param -> (validation(runParameters(param)) collectValue {
           case Failure(t) => Failure(new ParameterValidationException(
             Some(s"parameter '$param' in process block '${name}'"),
@@ -102,9 +102,9 @@ trait ProcessBlock {
    */
   private def validateResults(runResults: ResultMap): ResultMap = {
     val newResultMap = new ResultMap()
-    for (result <- results.keySet) yield {
+    for (result <- resultChecks.keySet) yield {
       if (runResults isDefinedAt result) {
-        val validation = results(result).asInstanceOf[Validation[Any]]
+        val validation = resultChecks(result).asInstanceOf[Validation[Any]]
         newResultMap.addResult(
           result,
           validation(runResults(result)) collectValue {
