@@ -2,9 +2,10 @@ package org.contakt.data.lineage
 
 import org.contakt.data.lineage.Validation._
 import org.scalatest.{Matchers, FlatSpec}
-import scala.concurrent.Future
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
-import scala.util.Failure
+import scala.util.{Success, Failure}
 
 /**
 * Tests for ProcessBlock class.
@@ -162,8 +163,87 @@ class ProcessBlockTests extends FlatSpec with Matchers {
     assert(runResults('diff).value.get.asInstanceOf[Failure[_]].exception.getCause.getMessage.startsWith(exceptionLabel))
   }
 
-  // TODO: it should "be able to use constant (pre-defined) parameters of the process block" in {}
+  it should "be able to use constant (pre-defined) parameters of the process block" in {
+    val constMap = Map[String, Int](
+      'b -> 2
+    )
+    val pb = new SimpleTestProcessBlock{
+      override def constParameters = new ParameterMap(constMap)(executionContext)
+    }
+    val map = Map[String, Int](
+      'a -> 3
+    )
+    val parameters = new ParameterMap(map)(pb.executionContext)
+    val runResults = pb run parameters
+    val resultsMap = runResults.awaitResults
+    for (key <- runResults.keySet) {
+      assert(runResults(key).isCompleted)
+    }
+    assert(runResults('sum).value.get.get === map('a) + constMap('b))
+    assert(runResults('diff).value.get.get === map('a) - constMap('b))
+  }
 
-  // TODO: it should "not allow a runtime parameter to have the same name as any constant parameter" in {}
+  it should "not allow a runtime parameter to have the same name as any constant parameter" in {
+    val constMap = Map[String, Int](
+      'b -> 2
+    )
+    val pb = new SimpleTestProcessBlock{
+      override def constParameters = new ParameterMap(constMap)(executionContext)
+    }
+    val map = Map[String, Int](
+      'a -> 3,
+      'b -> 2 // uh-oh, same name as a constant parameter!
+    )
+    val parameters = new ParameterMap(map)(pb.executionContext)
+    val runResults = pb run parameters
+    val resultsMap = runResults.awaitResults
+    for (key <- runResults.keySet) {
+      assert(runResults(key).isCompleted)
+    }
+    assert(runResults('sum).value.isDefined && runResults('sum).value.get.isFailure)
+    assert(checkExceptionChain(
+      runResults('sum),
+      List(classOf[ResultValidationException], classOf[ParameterValidationException], classOf[DuplicatedParameterNameException])
+    ))
+    assert(runResults('diff).value.isDefined && runResults('diff).value.get.isFailure)
+    assert(checkExceptionChain(
+      runResults('diff),
+      List(classOf[ResultValidationException], classOf[ParameterValidationException], classOf[DuplicatedParameterNameException])
+    ))
+  }
+
+  it should "not allow two results to have the same name" in {
+    val pb = new SimpleTestProcessBlock {
+      override def process: (ParameterMap) => ResultMap = { parameters: ParameterMap =>
+        val results = new ResultMap()
+        val sumResult = for (a <- parameters('a); b <- parameters('b)) yield (a.asInstanceOf[Int] + b.asInstanceOf[Int]) // 'for' can be used to add futures and return a future
+        results.addResult('sum, sumResult)
+        val diffResult = for (a <- parameters('a); b <- parameters('b)) yield (a.asInstanceOf[Int] - b.asInstanceOf[Int]) // 'for' can be used to subtract futures and return a future
+        results.addResult('diff, diffResult) // note: wrong result type - String, not Int
+        val doubleSumResult = for (a <- parameters('a); b <- parameters('b)) yield 2*(a.asInstanceOf[Int] + b.asInstanceOf[Int]) // 'for' can be used to add futures and return a future
+        results.addResult('sum, doubleSumResult) // uh-oh, same result name twice!
+        results
+      }
+    }
+    val map = Map[String, Int](
+      'a -> 3,
+      'b -> 2
+    )
+    val parameters = new ParameterMap(map)(pb.executionContext)
+    val runResults = pb run parameters
+    val resultsMap = runResults.awaitResults
+    for (key <- runResults.keySet) {
+      assert(runResults(key).isCompleted)
+    }
+    assert(runResults('sum).value.isDefined && runResults('sum).value.get.isFailure)
+    assert(checkExceptionChain(
+      runResults('sum),
+      List(classOf[ResultValidationException], classOf[DuplicatedResultNameException])
+    ))
+    val sum: Int = map('a) + map('b)
+    assert(runResults('sum).value.get.asInstanceOf[Failure[_]].exception.getCause.asInstanceOf[DuplicatedResultNameException].oldValue.value === Some(Success(sum)))
+    assert(runResults('sum).value.get.asInstanceOf[Failure[_]].exception.getCause.asInstanceOf[DuplicatedResultNameException].newValue.value === Some(Success(2*sum)))
+    assert(runResults('diff).value.get.get === map('a) - map('b))
+  }
 
 }

@@ -75,9 +75,13 @@ object Validation {
   def hasValueClass(clazz: Class[_])(implicit executionContext: ExecutionContext) = new Validation[Any] {
     override def apply(future: Future[Any]) = future map { value => // note use of 'map' to create a new Future based on the eventual completed value of 'future', with exceptions passed through automatically
       try {
-        val castValue = clazz cast value // check if value is a valid 'clazz'
-        // println(s"cast: $value [${value.getClass.getName}] => $castValue [${castValue.getClass.getName}]")
-        castValue
+        value match {
+          case t: Throwable => throw t
+          case _ =>
+            val castValue = clazz cast value // check if value is a valid 'clazz'
+            // println(s"cast: $value [${value.getClass.getName}] => $castValue [${castValue.getClass.getName}]")
+            castValue
+        }
       }
       catch {
         case t: Throwable => throw new ValidationException(Some(s"${classOf[Validation[Any]].getName}#hasResultClass"), s"value doesn't match class '${clazz.getName}': $value", value, Some(t))
@@ -88,10 +92,14 @@ object Validation {
   /** This validation checks that the result of the future has a particular value. */
   def equalTo(expectedValue: Any)(implicit executionContext: ExecutionContext) = new Validation[Any] {
     override def apply(future: Future[Any]) = future map { value => // note use of 'map' to create a new Future based on the eventual completed value of 'future', with exceptions passed through automatically
-      if (value == expectedValue) {
-        value
-      } else {
-        throw new ValidationException(Some(s"${classOf[Validation[Any]].getName}#equalTo"), s"value doesn't equal expected value '$expectedValue': $value", value, None)
+      value match {
+        case t: Throwable => throw t
+        case _ =>
+          if (value == expectedValue) {
+            value
+          } else {
+            throw new ValidationException(Some(s"${classOf[Validation[Any]].getName}#equalTo"), s"value doesn't equal expected value '$expectedValue': $value", value, None)
+          }
       }
     }
   }
@@ -101,4 +109,4 @@ object Validation {
 /**
 * Exception for validation errors.
 */
-case class ValidationException(label: Option[String], message: String, value: Any, cause: Option[Throwable]) extends Exception(if (label.isDefined) s"$label: $message" else message, cause getOrElse null) {}
+case class ValidationException(val label: Option[String], val message: String, val value: Any, val cause: Option[Throwable]) extends Exception(if (label.isDefined) s"$label: $message" else message, cause getOrElse null) {}

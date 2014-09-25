@@ -1,6 +1,5 @@
 package org.contakt.data.lineage
 
-import org.contakt.data.lineage._
 import scala.concurrent.{Future, ExecutionContext}
 import scala.util.{Try, Failure}
 
