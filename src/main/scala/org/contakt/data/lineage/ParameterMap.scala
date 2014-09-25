@@ -76,7 +76,7 @@ class ParameterMap(parameters: Map[String, Future[Any]])(implicit executionConte
 /**
  * Exception for duplicated parameter errors.
  */
-class DuplicatedParameterNameException(name: String, oldValue: Any, newValue: Any) extends Exception(s"duplicated string name in parameter map: $name: old value = ($oldValue), new value = ($newValue)") {}
+class DuplicatedParameterNameException(name: String, oldValue: Future[_], newValue: Future[_]) extends Exception(s"duplicated string name in parameter map: $name: old value = ($oldValue), new value = ($newValue)") {}
 
 /**
  * Exception for parameter validation errors.

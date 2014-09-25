@@ -2,7 +2,7 @@ package org.contakt.data.lineage
 
 import scala.collection.mutable.HashMap
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future, ExecutionContext}
+import scala.concurrent.{Promise, Await, Future, ExecutionContext}
 import scala.util.Try
 
 /**
@@ -17,27 +17,22 @@ class ResultMap(implicit executionContext: ExecutionContext) {
    * Adds a result to the result map in a thread-safe way.
    * @param name name of the result.
    * @param value a Future value for the result.
-   * @return the added result value.
-   * @throws DuplicatedResultNameException if the map already contains a result with the same name.
-   *
+   * @return whether the result was added or not.
    */
-  def addResult(name: String, value: Future[_]): Future[_] = {
+  def addResult[T](name: String, value: Future[T]): Boolean = {
     synchronized {
       if (results.isDefinedAt(name)) {
-        throw new DuplicatedResultNameException(name, results.get(name), value)
+        // println(s"duplicated result name '$name', old = ${results(name)} (${results(name).value}), new = $value (${value.value})")
+        val failurePromise = Promise[T]
+        failurePromise failure (new DuplicatedResultNameException(name, results(name), value))
+        results.put(name, failurePromise.future)
+        false
+      } else {
+        results.put(name, value)
+        true
       }
-      results.put(name, value)
-      value
     }
   }
-
-  /**
-   * Tries to add a result to the result map in a thread-safe way.
-   * @param name name of the result.
-   * @param value a Future value for the result.
-   * @return a Success value if the value could be added, or a Failure value otherwise.
-   */
-  def tryAddResult(name: String, value: Future[_]) = Try{ addResult(name, value) }
 
   /**
    * Whether the given result name has a value defined for it, or not.
@@ -109,7 +104,7 @@ class ResultMap(implicit executionContext: ExecutionContext) {
 /**
  * Exception for duplicated result errors.
  */
-class DuplicatedResultNameException(name: String, oldValue: Any, newValue: Any) extends Exception(s"duplicated string name in result map: $name: old value = ($oldValue), new value = ($newValue)") {}
+class DuplicatedResultNameException(val name: String, val oldValue: Future[_], val newValue: Future[_]) extends Exception(s"duplicated string name in result map: $name: old value = $oldValue (${oldValue.value}), new value = $newValue (${newValue.value})") {}
 
 /**
  * Exception for result validation errors.

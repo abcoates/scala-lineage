@@ -1,7 +1,7 @@
 package org.contakt.data.lineage
 
 import org.scalatest.{Matchers, FlatSpec}
-import scala.concurrent.Await
+import scala.concurrent.{Future, Await}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.util.{Success, Failure}
@@ -26,10 +26,14 @@ class ResultMapTests extends FlatSpec with Matchers {
     rmap addResult ('a, 1)
     rmap.size should be (1)
     assert(rmap isDefinedAt 'a)
-    assert(!(rmap isDefinedAt 'b))
-    assert(rmap tryAddResult ('a, 2) match {
-      case Failure(t) => t.isInstanceOf[DuplicatedResultNameException]
-      case other => false
+    rmap addResult ('a, 2)
+    rmap.awaitResults
+    assert(rmap('a).value match {
+      case Some(Failure(t)) if t.isInstanceOf[DuplicatedResultNameException] =>
+        val tdrne = t.asInstanceOf[DuplicatedResultNameException]
+        (tdrne.oldValue.value == Some(Success(1))) &&
+          (tdrne.newValue.value == Some(Success(2)))
+      case _ => false
     })
   }
 
@@ -62,6 +66,7 @@ class ResultMapTests extends FlatSpec with Matchers {
     rmap addResult ('e, false)
     rmap.size should be (5)
     val resultsMap = rmap.getResults
+    assert(resultsMap.isInstanceOf[Map[String, Future[_]]])
     for (key <- rmap.keySet) {
       assert(resultsMap(key) === rmap(key))
     }
