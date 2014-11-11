@@ -35,6 +35,19 @@ class ResultMap(implicit executionContext: ExecutionContext) {
   }
 
   /**
+   * Returns a new result map containing the results from this result map and the given result map.
+   * If the same named result occurs in both result maps, a future failure value is created in the combined map.
+   * @param results result map to add to this map.
+   * @return combined result map, possibly with some future failure values where a result was multiply defined.
+   */
+  def ++(results: ResultMap): ResultMap = {
+    val combinedResults = new ResultMap()
+    for (key <- keySet) { combinedResults.addResult(key, getResult(key)) }
+    for (key <- results.keySet) { combinedResults.addResult(key, results.getResult(key)) }
+    combinedResults
+  }
+
+  /**
    * Whether the given result name has a value defined for it, or not.
    * @param name name of the result.
    * @return whether there is a result for the given name.

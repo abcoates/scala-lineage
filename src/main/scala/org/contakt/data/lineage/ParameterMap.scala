@@ -33,9 +33,10 @@ class ParameterMap(parameters: Map[String, Future[Any]])(implicit executionConte
   def tryParameter(name: String): Try[Future[Any]] = Try{ getParameter(name) }
 
   /**
-   * Adds the given parameter map to this map.  If the same named parameter occurs in both parameter maps, a Future(Failure(...)) value is created in the combined map.
+   * Returns a new parameter map containing the parameters from this parameter map and the given parameter map.
+   * If the same named parameter occurs in both parameter maps, a future failure value is created in the combined map.
    * @param parameters parameter map to add to this map.
-   * @return combined parameter map, possibly with some Future(Failure(...)) values where a parameter was multiply defined.
+   * @return combined parameter map, possibly with some future failure values where a parameter was multiply defined.
    */
   def ++(parameters: ParameterMap): ParameterMap = {
     val combinedMap = new HashMap[String, Future[Any]]()

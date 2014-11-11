@@ -213,6 +213,7 @@ class ProcessBlockTests extends FlatSpec with Matchers {
   }
 
   it should "not allow two results to have the same name" in {
+    // Note: I have seen this fail, but intermittently, not reproducibly.  Subtle JVM startup timing issue?
     val pb = new SimpleTestProcessBlock {
       override def process: (ParameterMap) => ResultMap = { parameters: ParameterMap =>
         val results = new ResultMap()
@@ -241,6 +242,7 @@ class ProcessBlockTests extends FlatSpec with Matchers {
       List(classOf[ResultValidationException], classOf[DuplicatedResultNameException])
     ))
     val sum: Int = map('a) + map('b)
+    // println(s"result(sum): exception = ${runResults('sum).value.get.asInstanceOf[Failure[_]].exception.getCause.asInstanceOf[DuplicatedResultNameException]}")
     assert(runResults('sum).value.get.asInstanceOf[Failure[_]].exception.getCause.asInstanceOf[DuplicatedResultNameException].oldValue.value === Some(Success(sum)))
     assert(runResults('sum).value.get.asInstanceOf[Failure[_]].exception.getCause.asInstanceOf[DuplicatedResultNameException].newValue.value === Some(Success(2*sum)))
     assert(runResults('diff).value.get.get === map('a) - map('b))

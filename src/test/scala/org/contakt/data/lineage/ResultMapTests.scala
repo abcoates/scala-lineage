@@ -90,4 +90,20 @@ class ResultMapTests extends FlatSpec with Matchers {
     }
   }
 
+  it should "be possible to aggregate two result maps" in {
+    val rmap1 = new ResultMap()
+    rmap1 addResult ('a, 1)
+    rmap1 addResult ('b, 2.0)
+    rmap1 addResult ('c, 'c')
+    rmap1.size should be (3)
+    val rmap2 = new ResultMap()
+    rmap2 addResult ('d, "d")
+    rmap2 addResult ('e, false)
+    rmap2.size should be (2)
+    val rmap = rmap1 ++ rmap2
+    rmap.size should be (rmap1.size + rmap2.size)
+    for (key <- rmap1.keySet) { assert(rmap(key) === rmap1(key)) }
+    for (key <- rmap2.keySet) { assert(rmap(key) === rmap2(key)) }
+  }
+
 }

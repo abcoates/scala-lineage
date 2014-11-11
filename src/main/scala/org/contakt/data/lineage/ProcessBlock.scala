@@ -132,6 +132,11 @@ trait ProcessBlock {
 
   // TODO: add a method to return a dynamically-generated process map.
 
-  // TODO: how to flag unused run-time parameters?
-
 }
+
+// TODO: create a class for mapping results into parameters
+// TODO: it may map all or none by default to the same name
+// TODO: it may rename a value, or it may exclude it
+// TODO: however, there is no transformation/modification of the result values
+// TODO: there should be a fluent/DSL way to have one process after another in the code,
+// TODO: with a clear mapping from the results of the first to the parameters of the second
