@@ -55,6 +55,13 @@ package object lineage {
    */
   implicit def futureToRichFuture[T](future: Future[T]): RichFuture[T] = new RichFuture(future)
 
+  /**
+   * Creates a ResultToParameterMapping with no explicit mappings from a ResultToParameterDefault.
+   * @param defaultMapping the ResultToParameterDefault to use.
+   * @return new ResultToParameterMapping with the matching ResultToParameterDefault set as given.
+   */
+  implicit def defaultToMapping(defaultMapping: ResultToParameterDefault): ResultToParameterMapping = new ResultToParameterMapping(Map[String,String](), defaultMapping)
+
   /** Quick test that a 'Try' is a 'Success'. */
   def isSuccess(value: Try[_]): Boolean = value match {
     case Success(x) => true

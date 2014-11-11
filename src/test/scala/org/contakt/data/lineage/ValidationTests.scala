@@ -57,7 +57,7 @@ class ValidationTests extends FlatSpec with Matchers {
     val future = newSuccessFuture
     assert(!future.isCompleted)
     assert(future.value === None)
-    val validation = NONE
+    val validation = NO_VALIDATION
     val validatedFuture = validation(future)
     assert(validatedFuture eq future)
     Await.ready(validatedFuture, Duration.Inf)

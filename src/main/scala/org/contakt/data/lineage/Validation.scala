@@ -67,7 +67,7 @@ abstract class Validation[T](label: Option[String] = None)(implicit executionCon
 object Validation {
 
   /** A pass-through validation that doesn't check anything. */
-  def NONE(implicit executionContext: ExecutionContext) = new Validation[Any] {
+  def NO_VALIDATION(implicit executionContext: ExecutionContext) = new Validation[Any] {
     override def apply(future: Future[Any]) = future
   }
 

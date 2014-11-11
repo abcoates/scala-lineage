@@ -2,7 +2,7 @@ package org.contakt.data.lineage
 
 import org.scalatest.{Matchers, FlatSpec}
 import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.global
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
  * Tests for ResultToParameterMappingTests class.
@@ -15,7 +15,7 @@ class ResultToParameterMappingTests extends FlatSpec with Matchers {
   RESULTS.addResult('c, Future{ 3 })
 
   "A result-to-parameter mapping" should "be able to map all results to parameters" in {
-    val params: ParameterMap = RESULTS :: ALL
+    val params: ParameterMap = RESULTS :: MAP_ALL
     assert(params.size === RESULTS.size)
   }
 
